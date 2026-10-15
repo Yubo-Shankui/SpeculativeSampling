@@ -1,4 +1,4 @@
-<p align="center" style="border-radius: 10px">
+<p align="center">
   <img src="assets/speculative-sampling-logo.png" width="100%" alt="Speculative Sampling logo">
 </p>
 
