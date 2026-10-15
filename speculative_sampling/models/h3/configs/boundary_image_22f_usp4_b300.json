@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "id": "minimax_h3_boundary_image_22f_usp4_b300",
+  "model": {
+    "family": "minimax-h3",
+    "variant": "sol-h3-4step-preview-v1",
+    "task": "i2av",
+    "checkpoint": "${H3_MODEL_PATH}"
+  },
+  "adapter": {
+    "session_class": "speculative_sampling.models.h3.session:H3SpeculativeSamplingLiveSession",
+    "worker_factory": "h3_runtime.engine:MiniMaxH3Inference",
+    "launch_entry": "scripts/h3_live_demo.py"
+  },
+  "conditioning": {
+    "text": true,
+    "image": true,
+    "audio": false
+  },
+  "sampling": {
+    "native_chunk_latents": null,
+    "proposal_frames": 22,
+    "denoise_schedule": [
+      4
+    ],
+    "denoise_forwards": 4,
+    "clean_commit_forwards": 0,
+    "steady_dit_forwards": 4
+  },
+  "continuation": {
+    "kind": "boundary_image",
+    "branch_policy": "rgb_reencode_any_frame"
+  },
+  "decoder": {
+    "backend": "original",
+    "kind": "minimax_streaming_av",
+    "forkable": false,
+    "streaming_granularity": "decoded_block"
+  },
+  "media": {
+    "width": 832,
+    "height": 480,
+    "fps": 24,
+    "audio": "native"
+  },
+  "deployment": {
+    "gpu_count": 4,
+    "roles": {
+      "generator": {
+        "gpus": 4,
+        "parallelism": {
+          "kind": "ulysses",
+          "degree": 4
+        }
+      }
+    }
+  },
+  "live_scheduling": {
+    "default_initial_budget_seconds": 0.6,
+    "auto_extend_timeline": true,
+    "extension_mode": "jit_continuation",
+    "condition_ready_to_first_commit_seconds": 0.6,
+    "continuation_to_first_commit_seconds": 0.6,
+    "ema_alpha": 0.2,
+    "ema_margin_seconds": 0.0,
+    "delivery_credit_frames": 0,
+    "rtc_jitter_target_seconds": 0.075
+  }
+}

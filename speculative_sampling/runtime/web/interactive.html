@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>H3 · Live Frame-wise</title>
+<style>
+:root{color-scheme:dark;font:15px/1.55 system-ui,sans-serif;background:#101416;color:#e6edeb}
+*{box-sizing:border-box}body{margin:0}main{max-width:1220px;margin:auto;padding:28px}
+header{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}
+h1{margin:0;font-size:25px;letter-spacing:-.7px}small,.muted{color:#98aba6}
+#profileLabel{display:none}
+.pill{border:1px solid #3c5550;border-radius:30px;padding:5px 14px;color:#a9e3cd}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:22px}
+canvas,video{width:100%;aspect-ratio:7/4;background:#080b0c;border-radius:12px;display:block;object-fit:contain}
+.media-stage{position:relative}.victory{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(9,7,3,.42),transparent);color:#d7b96a;font:500 clamp(25px,4vw,54px)/1 Georgia,serif;letter-spacing:.13em;text-shadow:0 2px 12px #000,0 0 25px #9e762d;animation:victory-in 1.2s ease both}.victory[hidden]{display:none}.battle-over{margin:10px 0;padding:10px 12px;border:1px solid #77643b;border-radius:7px;color:#d9c17c;background:#211d13;text-align:center}.battle-over button{margin-left:10px}
+[hidden]{display:none!important}
+.panel{background:#192021;border:1px solid #2c3836;border-radius:12px;padding:18px}
+label{display:block;font-size:13px;color:#adbfba;margin:14px 0 6px}
+textarea,input,select{width:100%;background:#101617;color:#ecf4f1;border:1px solid #455752;border-radius:7px;padding:10px;font:inherit}
+textarea{resize:vertical;min-height:140px}input[type=file]{font-size:12px}
+#prompt{min-height:250px;font-size:13px}
+.latency{margin-top:18px;padding:18px;border:1px solid #385348;border-radius:12px;background:#17201e}
+.latency h2{font-size:16px;margin:0 0 4px}.latency .eyebrow{font-size:12px;color:#9eaea8}
+.latency .hero{font-size:30px;line-height:1.4;color:#c6f0d6;display:block}
+.timing-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.timing-grid>div{background:#101916;border-radius:7px;padding:10px;font-size:12px;color:#aebdb6}
+.timing-grid strong{display:block;color:#e6edeb;font-size:17px;font-variant-numeric:tabular-nums}
+.timing-grid small{display:block;font-size:11px}
+.timing-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 20px;margin-top:10px}
+.timing-list>div{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.timing-list span{color:#adbfba}.timing-list b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.prompt-latencies{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.prompt-latencies span{border:1px solid #3c5550;border-radius:5px;padding:4px 7px;font-size:11px}
+.latency details{margin-top:12px;font-size:12px;color:#9eaea8}.latency summary{cursor:pointer}
+.telemetry-layout{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:18px;align-items:start;margin-top:18px}
+.telemetry-layout>.controller,.telemetry-layout>.latency{min-width:0;margin-top:0}
+.controller{margin-top:18px;padding:18px;border:1px solid #344541;border-radius:12px;background:#151c1c}
+.controller-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:14px}
+.controller h2{font-size:16px;margin:0}.controller-summary{font-size:12px;color:#9eaea8;text-align:right}
+.fsm{display:grid;grid-template-columns:1fr 34px 1fr;align-items:center;gap:8px;margin-bottom:14px}
+.state-node{border:1px solid #3c4a47;border-radius:9px;padding:10px 12px;background:#101616;color:#82918d;transition:.2s ease}
+.state-node strong{display:block;color:inherit}.state-node small{display:block;font-size:11px}
+.state-node.active{border-color:#71c995;background:#183126;color:#d0f4dd;box-shadow:0 0 0 1px #4c8f68 inset}
+.state-node.waiting{border-color:#8b7250;color:#e7c68d;background:#2b2419}
+.state-arrow{text-align:center;color:#61706c;font-size:20px}.state-arrow.active{color:#78d3a0;animation:pulse 1s ease-in-out infinite alternate}
+.controller-decision{font-size:12px;color:#bfd0ca;margin:-4px 0 12px;min-height:19px}
+.timeline{position:relative;padding:20px 0 16px;border-top:1px solid #2b3835;border-bottom:1px solid #2b3835}
+.rail{position:relative;height:23px;margin:6px 0 6px 112px;background:#0d1212;border-radius:5px;overflow:hidden}
+.rail-label{position:absolute;right:calc(100% + 10px);top:3px;width:102px;text-align:right;font-size:11px;color:#91a39e;white-space:nowrap}
+.segment{position:absolute;top:3px;height:17px;min-width:2px;border-radius:4px;transition:left .15s linear,width .15s linear}
+.segment.producing{background:repeating-linear-gradient(135deg,#4a9b68,#4a9b68 7px,#5eb37c 7px,#5eb37c 14px);animation:flow .7s linear infinite}
+.segment.ready{background:#315e48}.segment.committed{background:#b28646}.segment.played{background:#53615e}
+.playhead,.boundary-marker{position:absolute;top:16px;bottom:11px;width:2px;background:#eaf8f0;z-index:3;transition:left .15s linear}
+.boundary-marker{background:#e8a54b;border-left:1px dashed #e8a54b;opacity:.9}
+.playhead-label,.boundary-label{position:absolute;top:0;transform:translateX(-50%);font-size:10px;color:#dce8e4;white-space:nowrap}
+.boundary-label{top:auto;bottom:0;color:#e9bd7d}
+.timeline-scale{margin-left:112px;display:flex;justify-content:space-between;color:#657672;font-size:10px}
+.controller-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.controller-meta>div{padding:8px 10px;background:#101616;border-radius:6px;font-size:11px;color:#8fa19b}
+.controller-meta b{display:block;color:#d9e5e1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.controller-events{display:flex;gap:6px;overflow:hidden;margin-top:10px;min-height:25px}
+.controller-events span{flex:none;border:1px solid #344a43;border-radius:12px;padding:3px 8px;color:#9eb4ac;font-size:10px}
+.waterfall{display:grid;grid-template-columns:105px 1fr 62px;gap:6px 9px;align-items:center;margin:12px 0;padding:11px;background:#101916;border-radius:7px;font-size:11px}
+.waterfall-track{height:8px;background:#27322f;border-radius:5px;overflow:hidden}.waterfall-bar{height:100%;border-radius:5px;transition:width .2s}.wf-queue{background:#a07c43}.wf-generate{background:#57a978}.wf-deliver{background:#5f8eb0}
+.waterfall-value{text-align:right;font-variant-numeric:tabular-nums;color:#dbe8e3}
+@keyframes pulse{to{opacity:.35}}@keyframes flow{to{background-position:20px 0}}@keyframes victory-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.state-arrow.active,.segment.producing{animation:none}}
+button{cursor:pointer;border:1px solid #49695d;border-radius:7px;padding:10px 15px;background:#b9ebcd;color:#10231a;font:600 14px system-ui}
+button.secondary{background:transparent;color:#c7d6cf}button:disabled{opacity:.4;cursor:default}
+.buttons{display:flex;gap:8px;margin-top:14px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0}
+.inline-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.inline-control button{padding:10px 14px}
+.duel-actions{display:grid;gap:8px;margin:10px 0 14px}.duel-action{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;width:100%;padding:10px 11px;text-align:left;background:#111718;color:#c7d6cf;border-color:#344541;font-size:12px;line-height:1.45}.duel-action .duel-number{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#273432;color:#a9c0b8}.duel-action.selected{border-color:#9cdbbe;background:#20332b;color:#eef9f3;box-shadow:0 0 0 1px #9cdbbe inset}.duel-action.selected .duel-number{background:#b9ebcd;color:#10231a}.duel-help{display:block;margin-bottom:12px}
+.duel-action strong,.duel-action small{display:block}.duel-action small{margin-top:2px;font-weight:400;color:#91a59f}.duel-action.terminal{border-color:#6d5c37}.duel-action:disabled{opacity:.35}
+.stat{background:#192021;padding:12px;border-radius:8px}.stat strong{display:block;font-size:21px}.stat strong.compact{font-size:16px;line-height:1.55}
+.caption{min-height:65px;max-height:150px;overflow:auto;padding:14px 0;white-space:pre-wrap}
+#notice{min-height:27px;color:#f0c77b;overflow-wrap:anywhere}
+#reference{width:100%;max-height:150px;object-fit:contain;border-radius:6px;margin-top:8px}
+.hint{font-size:12px;line-height:1.7;color:#97aaa3;margin-top:16px}
+@media(min-width:1301px){main{max-width:1680px}}
+@media(max-width:1300px){.telemetry-layout{grid-template-columns:1fr}}
+@media(max-width:900px){.layout{grid-template-columns:1fr}main{padding:15px}.stats{grid-template-columns:repeat(2,minmax(0,1fr));font-size:12px}.timing-grid{grid-template-columns:repeat(2,1fr)}.controller-meta{grid-template-columns:1fr}}
+</style>
+<main>
+<header><div><h1 id="demoTitle">H3 / Live Frame-wise</h1><small id="profileLabel"></small></div><span id="health" class="pill">Connecting</span></header>
+<div class="layout">
+  <section>
+    <div class="media-stage"><canvas id="screen" width="672" height="384"></canvas>
+    <video id="rtcVideo" autoplay playsinline hidden></video><div id="victory" class="victory" hidden>GREAT ENEMY FELLED</div></div>
+    <div class="stats">
+      <div class="stat">Playback position<strong id="playtime">0.00s</strong></div>
+      <div class="stat">Server future buffer<strong id="buffer">0.00s</strong></div>
+      <div class="stat">Scheduling lead time<strong id="budget" class="compact">—</strong></div>
+      <div class="stat">DiT sampling time<strong id="ditSummary">—</strong></div>
+    </div>
+    <div class="muted" id="stage">Ready to start</div>
+    <div class="caption" id="onscreen">Upload a reference image or use the default Henry frame, then enter a prompt to begin.</div>
+    <div id="notice" role="status"></div>
+    <div class="telemetry-layout">
+    <section class="controller" aria-label="SpeculativeSampling live controller">
+      <div class="controller-head"><h2>SpeculativeSampling Controller</h2><div class="controller-summary" id="controllerSummary">Waiting for session</div></div>
+      <div class="fsm">
+        <div class="state-node" id="produceState"><strong>Produce</strong><small id="produceDetail">Waiting for job</small></div>
+        <div class="state-arrow" id="stateArrow">→</div>
+        <div class="state-node" id="consumeState"><strong>Consume</strong><small id="consumeDetail">Waiting for playable media</small></div>
+      </div>
+      <div class="controller-decision" id="controllerDecision">No commit decision yet</div>
+      <div class="timeline" id="controllerTimeline">
+        <div class="playhead" id="controllerPlayhead"><span class="playhead-label">play</span></div>
+        <div class="boundary-marker" id="controllerBoundary"><span class="boundary-label">cut</span></div>
+        <div class="rail"><span class="rail-label">Generation job</span><i class="segment producing" id="productionSegment"></i></div>
+        <div class="rail"><span class="rail-label">Ready future</span><i class="segment ready" id="readySegment"></i></div>
+        <div class="rail"><span class="rail-label">Committed buffer</span><i class="segment committed" id="committedSegment"></i></div>
+        <div class="rail"><span class="rail-label">Playback</span><i class="segment played" id="playedSegment"></i></div>
+        <div class="timeline-scale"><span id="timelineStart">0.0s</span><span id="timelineEnd">5.2s</span></div>
+      </div>
+      <div class="controller-meta">
+        <div>Current action<b id="controllerAction">idle</b></div>
+        <div>Reuse state<b id="controllerReuse">—</b></div>
+        <div>Future handling<b id="controllerDiscard">No discard</b></div>
+        <div>RTC sender<b id="controllerSender">Waiting for connection</b></div>
+      </div>
+      <div class="controller-events" id="controllerEvents" aria-label="Recent controller events"></div>
+    </section>
+    <section class="latency" aria-label="Latency and overhead">
+      <h2>Latency &amp; Overhead</h2>
+      <div class="eyebrow" id="latencyVersion">Waiting for this page to submit and display its first frame</div>
+      <strong class="hero" id="e2eLatency">—</strong>
+      <div class="eyebrow">Prompt submission → first frame for the corresponding prompt version</div>
+      <div class="timing-grid">
+        <div>Server wait<strong id="queueLatency">—</strong><small>Request received → production starts</small></div>
+        <div>First chunk ready<strong id="firstLatency">—</strong><small>Production starts → first deliverable chunk</small></div>
+        <div>First commit<strong id="commitLatency">—</strong><small>Production starts → RTC sender takes first frame</small></div>
+        <div>Full proposal ready<strong id="totalLatency">—</strong><small id="totalHint">Production starts → 124 frames ready</small></div>
+      </div>
+      <div class="waterfall" aria-label="First-frame critical path">
+        <span>Queue / schedule</span><div class="waterfall-track"><div class="waterfall-bar wf-queue" id="queueBar"></div></div><b class="waterfall-value" id="queuePath">—</b>
+        <span>Produce first chunk</span><div class="waterfall-track"><div class="waterfall-bar wf-generate" id="generateBar"></div></div><b class="waterfall-value" id="generatePath">—</b>
+        <span>Request / transport / playback</span><div class="waterfall-track"><div class="waterfall-bar wf-deliver" id="deliverBar"></div></div><b class="waterfall-value" id="deliverPath">—</b>
+      </div>
+      <div class="eyebrow" id="timingProposal">Stage timing: waiting for server data</div>
+      <div class="timing-list">
+        <div><span>Text encoding · GPU</span><b id="textLatency">—</b></div>
+        <div><span>Condition encoding · GPU</span><b id="conditionLatency">—</b></div>
+        <div><span>DiT sampling loop · GPU</span><b id="ditLatency">—</b></div>
+        <div><span>Audio VAE · GPU</span><b id="audioVaeLatency">—</b></div>
+        <div><span>Video VAE windows · GPU</span><b id="videoVaeLatency">—</b></div>
+        <div><span>Media preparation · wall time</span><b id="mediaLatency">—</b></div>
+        <div><span>Artifact persistence · wall time</span><b id="persistLatency">—</b></div>
+        <div><span>Control-path RTT</span><b id="rttLatency">—</b></div>
+        <div><span id="decodeLabel">Local decode preparation · per frame</span><b id="decodeLatency">—</b></div>
+        <div><span id="bufferLabel">Local queue to render</span><b id="clientBufferLatency">—</b></div>
+      </div>
+      <div class="prompt-latencies" id="promptLatencies"></div>
+    </section>
+    </div>
+    <div id="mediaHint" hidden></div>
+  </section>
+  <section class="panel">
+    <div id="referenceControls">
+      <label for="upload">Initial reference image (optional; default available)</label>
+      <input id="upload" type="file" accept="image/png,image/jpeg,image/webp">
+      <img id="reference" alt="Initial reference image" hidden>
+    </div>
+    <div id="promptEditor">
+      <label for="prompt">Next prompt</label>
+      <textarea id="prompt">[Edit the action here:
+The cat walks to the cat tree in the back and lies down.]
+
+Locked-off camera, low-angle eye-level medium-wide shot. Keep the camera completely still: no dolly, pan, rotation, zoom, or cuts.
+
+The scene is a spacious, warm-toned indoor cat activity room with light honey-colored wood flooring and beige plaster walls with natural mottled texture. The room has large white-framed windows, a natural-wood cube cat house, and a large wooden cat tree. The cat tree has a circular wooden base, several cylindrical scratching posts wrapped in light-brown sisal rope, and staggered wooden platforms. The palette is beige, light brown, and natural wood, with natural materials and a clean, warm style.
+
+A large long-haired tabby cat with a sturdy build and a thick coat. Its fur is primarily gray-brown, with alternating dark-brown and charcoal tabby markings across its back, flanks, legs, and tail. Dense, lighter gray-beige fur around the neck and chest forms a pronounced fluffy ruff. The cat has a round face with a clear dark M-shaped marking on its forehead; upright ears with small tufts along the edges and tips; large round eyes ranging from yellow-green to amber-green; a pale brown-pink nose; a lighter muzzle; and long white whiskers. Its long, thick, very fluffy tail has a darker tip. The coat is fine and soft, with distinct long-haired layering and a natural sheen.</textarea>
+      <small>Edit the action inside the opening brackets; keep the camera, scene, and cat appearance descriptions unchanged.</small>
+    </div>
+    <div id="duelControls" hidden>
+      <label id="gameActionLabel">Choose the next duel action</label>
+      <small id="gameActionHelp" class="duel-help">Actions play once, then automatically return to the guarded standoff. The finisher ends the battle.</small>
+      <div id="duelActions" class="duel-actions"></div>
+      <div id="battleOver" class="battle-over" hidden><span id="battleOverText">Battle over</span> <button id="restartDuel" type="button" class="secondary">Challenge again</button></div>
+    </div>
+    <label for="mode">Continuation condition (select before starting)</label>
+    <select id="mode"><option value="latent">Direct boundary-latent continuation · Experimental</option><option value="image" selected>Boundary RGB → encode · Default</option><option value="relay">Phase-aligned relay · 7 latent / 22-frame context</option></select>
+    <small id="modeHint" hidden></small>
+    <div id="vaeControls" hidden>
+      <label for="vaeBackend">Video VAE (select before starting)</label>
+      <select id="vaeBackend"></select>
+      <small>Original preserves the released overlapping-window decoder. Sol-H3 uses TAE boundary encoding and causal streaming decode.</small>
+    </div>
+    <div id="policyControls" hidden>
+      <label for="policy">Serving policy (select before starting)</label>
+      <select id="policy"><option value="co" selected>SpeculativeSampling · Exact safe boundary</option><option value="base" disabled>Base · Next native chunk boundary (enabled in matrix deployments)</option></select>
+      <small>Both policies use the same model, K, ReRoPE, MTSS, and VAE; only the scheduling boundary for the replaceable suffix changes.</small>
+    </div>
+    <label for="transport">Media transport (select before starting)</label>
+    <select id="transport"><option value="websocket">JPEG + PCM / WebSocket · Fallback</option><option value="rtc" selected>H.264 + Opus / WebRTC · Default</option></select>
+    <small id="rtcHint">RTC requires a reachable media path or TURN; the SSH tunnel carries only the page and control traffic.</small>
+    <label for="seed">Seed</label><input id="seed" type="number" min="0" value="42">
+    <div class="buttons"><button id="start" disabled>Start</button><button id="send" disabled>Update prompt</button><button id="stop" class="secondary" disabled>Stop</button></div>
+    <label for="volume">Volume</label><input id="volume" type="range" min="0" max="1" step=".01" value=".65">
+    <div id="leadControls">
+      <label for="leadSeconds">Scheduling lead time (seconds)</label>
+      <div class="inline-control"><input id="leadSeconds" type="number" min="0.1" max="10" step="0.05" value="1.72"><button id="applyLead" class="secondary" disabled>Apply</button></div>
+      <small>Applies from the next scheduling decision; current in-flight work and frozen cuts are unchanged.</small>
+    </div>
+  </section>
+</div>
+</main>
+<script src="/latency.js"></script>
+<script src="/startup_buffer.js"></script>
+<script src="/game-config.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const duelUI = new URLSearchParams(location.search).get("ui") === "duel" ||
+  new URLSearchParams(location.search).has("game") ||
+  location.pathname === "/margit-duel" || location.pathname === "/margit-duel.html";
+const duelTemplate = `Continuous third-person action-RPG gameplay in the visual style of Elden Ring. Use a normal elevated gameplay camera behind the Tarnished, angled gently down toward the ground, keeping both combatants, their feet and the attack contact points readable. Maintain stable character scale and a clear playable distance between them. Follow movement smoothly without cinematic cuts, low-angle hero shots, dramatic zooms, shallow portrait depth of field or slow motion. Preserve the scene and character identities from the reference image. Attacks have a readable preparation, a decisive release, believable contact and a distinct recovery; Margit's delayed attacks retain their held anticipation.
+
+SCENE: The weathered stone causeway before Stormveil Castle, outdoors in overcast daylight. Uneven cracked gray flagstones have olive moss and sparse weeds in the joints. Loose stones, broken timber and damaged wooden barricades lie mostly near the edges. Massive gray castle walls and buttresses border one side; an arched castle doorway with a restrained golden fog curtain stands at the far end. The other side opens toward a misty ravine beyond broken parapets and irregular stakes, with sparse scrub and ochre-yellow foliage. Muted gray-green and earth colors, diffuse daylight, rough game-rendered stone, cloth and metal. Maintain the established layout as the camera moves. Cloth, hair, dust and debris react locally to movement and impacts.
+
+TARNISHED_ID: A lone human adventurer in practical weathered steel plate over chainmail, leather straps, a worn muted dark-red cloak and a closed plain knight helmet. Keep the reference armor and silhouette consistent. Normally holds a small round metal shield in the left hand and a straight steel sword in the right. For sorcery, put away the right-hand sword and equip a glintstone staff in that hand. For Lightning Spear, put away the shield and hold a sacred seal in the left hand while keeping the right-hand sword lowered. Show distinct equipment swaps; never morph a sword into a staff or a shield into a spell.
+
+MARGIT_ID: Margit, the Fell Omen: a large stooped omen, roughly twice human standing height in his hunched posture, with a forward-projecting head, irregular asymmetrical curled horns, weathered gray skin and shaggy dirty white-gray hair and beard. Coarse brown and olive-tan cloth folds over his broad hunched shoulders, tied with thick rope across the upper torso; dark frayed layers hang around his legs. Long sinewy bare forearms, large hands, thin exposed lower legs and large bare feet. A long fleshy tail with hornlike growths trails behind him and follows his turns. His right hand carries a long dark gnarled wooden staff, held low between attacks. His free left hand conjures golden spectral weapons only when the selected action requires them. Keep his horns, face, cloth, staff and tail consistent.
+
+IDLE_AND_EFFECTS: Between attacks the Tarnished guards with the left-hand shield and takes short cautious lateral steps; Margit remains hunched, tracking the player with slow steps and small turns. No constant spell glow or permanently equipped golden weapon. Golden spectral weapons and lightning remain distinct from cyan-blue glintstone sorcery. Effects originate at the relevant hand, catalyst or contact point and fade after the action. Nonterminal actions leave both characters alive. Only the explicitly selected finisher may kill Margit; after his death retain the empty arena and surviving Tarnished without respawning him.
+
+PRESENTATION: One continuous playable-looking shot with restrained game lighting and readable silhouettes. Absolutely no HUD, health bars, stamina bars, boss labels, compass, lock-on marker, menus, numbers, subtitles, victory lettering, logos or watermarks.`;
+const finisherActionA = `The Tarnished stops moving, plants the feet and bends the knees slightly, bringing the staff up into a forward-facing casting posture. Cyan-blue light gathers ahead of the raised staff, swelling into curved rotating streaks and a brilliant concentrated core. The gathered energy erupts forward as a sustained, thick turquoise sorcery torrent with a white-blue center, streaming filaments and sparkling fragments along its edges. The Tarnished remains braced in the same casting stance, maintaining the beam toward Margit instead of swinging the staff or walking forward. The torrent strikes Margit's torso and continues to pour across the gap; keep the sustained beam active through the end of this action.`;
+const finisherActionB = `The sustained turquoise sorcery torrent weakens and dies away. Mortally wounded, Margit loses his balance. His large body folds and drops toward the stone, his robes and tail falling with him and the staff lowering out of its fighting position. A bright pale-gold and white burst spreads from his collapsing body into many fine luminous motes, mixed with curling translucent wisps. His physical silhouette breaks apart and disappears within the fading effect, leaving no solid corpse standing or kneeling in the arena. The Tarnished lowers the staff and remains facing the now-empty space while the last motes disperse.`;
+const duelActions = [
+  {title:"Idle · Guarded standoff",detail:"Circle, observe, and hold distance",prompt:`The Tarnished holds the small shield in front of the chest with the left arm and keeps the straight sword low in the right hand. With knees slightly bent, the Tarnished takes short sideways steps without turning away from Margit. Margit remains hunched, his long staff held low in his right hand and his tail trailing behind him. He takes a few slow lateral steps and turns his shoulders and feet to keep facing the Tarnished. They circle cautiously at several paces apart, making small weight shifts without attacking or casting.`},
+  {title:"Tarnished · Guard and counter",detail:"Block the staff, then answer with steel",prompt:`The Tarnished advances two short steps with the shield raised. Margit's staff strikes the shield; the Tarnished braces behind it, the left arm jolting backward as a brief spray of sparks marks the contact. As the staff passes, the Tarnished steps forward and delivers one firm right-handed sword cut into Margit's lower torso. Margit's upper body recoils slightly, but he stays on his feet. The Tarnished withdraws the sword and takes a short step back, bringing the shield in front of the chest again.`},
+  {title:"Tarnished · Parry and riposte",detail:"A precise, nonlethal critical strike",prompt:`As Margit's staff swings into reach, the Tarnished snaps the left-hand buckler outward into the incoming weapon instead of holding a static block. A sharp flash and sparks mark the parry, and the staff is knocked off its path. Margit's torso pitches forward and lowers into a staggered, vulnerable posture. The Tarnished steps directly in front of him, draws the right-hand sword back, then drives its point into the exposed front of his torso. After a brief hold, the Tarnished pulls the blade free and steps away. Margit slumps from the impact, then begins to recover; he remains alive and solid.`},
+  {title:"Tarnished · Carian Slicer",detail:"Fast blue sorcery at close range",prompt:`With a glintstone staff in the right hand, the Tarnished turns the shoulders and sweeps the casting arm across the front of the body. A translucent cyan-blue sword blade forms along the staff's striking direction and cuts through the space immediately in front of the Tarnished. A quick return swing follows, making a second close-range slash with a short blue light trail and small glintstone sparks at contact. Margit shifts backward from the cuts without falling. The magical blade vanishes after the swings; the Tarnished stops casting rather than firing a projectile or maintaining a permanent glowing sword.`},
+  {title:"Tarnished · Lightning Spear",detail:"Sacred seal, cast, and golden impact",prompt:`The Tarnished raises the left hand holding the sacred seal above shoulder height. A brief golden incantation sigil appears near the lifted hand, and branching yellow-gold electricity gathers into a long jagged lightning spear. The Tarnished draws the casting arm back, turns the torso, then snaps the arm forward in an overarm throw. The lightning spear leaves the hand and streaks toward Margit. Margit moves sideways; the bolt strikes the stones beside him in a short branching electrical flash. The Tarnished lowers the casting hand as the remaining sparks fade.`},
+  {title:"Margit · Delayed staff slam",detail:"Long wind-up, sudden heavy impact",prompt:`Margit raises the gnarled staff high with his right arm, straightening slightly while his free left hand balances his body. He holds the threatening wind-up for a noticeable beat, still facing the Tarnished, then drops his weight forward and brings the staff down in a sudden heavy blow. The Tarnished waits through the held wind-up and rolls diagonally out of the descending staff's path. The staff hits the stone where the Tarnished was standing, throwing up a compact burst of dust and loose chips. Margit stays bent forward briefly before pulling the staff back.`},
+  {title:"Margit · Golden dagger combo",detail:"Fast close-range blade and staff chain",prompt:`At close range, Margit forms a short luminous gold dagger in his free left hand while retaining the wooden staff in his right. He flicks the dagger across the Tarnished's upper body in a fast compact cut, then rotates his shoulders into a wider right-hand staff sweep. The Tarnished catches the dagger cut on the raised shield, producing a small sharp flash, then rolls out of the following staff sweep. The dagger dissolves into a few golden motes as Margit finishes the turn. The Tarnished rises just outside close range and faces him again.`},
+  {title:"Margit · Ranged dagger chase",detail:"Throw, advance, and maintain pressure",prompt:`At several paces from the Tarnished, Margit keeps the wooden staff in his right hand and briefly forms a small radiant gold dagger in his left. He makes a quick throwing motion toward the Tarnished; the dagger travels directly across the gap with a narrow golden streak. The Tarnished turns the shield toward the incoming blade and absorbs the hit in a brief flash. Margit then takes deliberate forward steps with the staff ready, closing some of the distance. The Tarnished shifts sideways while keeping the shield between them. Both remain standing and ready to fight.`},
+  {title:"Margit · Golden hammer slam",detail:"Aerial heavy attack with a long recovery",prompt:`Margit retains the staff in his right hand as a massive translucent golden hammer forms in his left. He lifts the glowing hammer and launches himself toward the Tarnished, his ragged robes and long tail following behind. As he descends, he drives the hammer head down into the Tarnished's position. The Tarnished rolls out of the landing area. The hammer crashes into the stone with a bright gold impact flash, dust and loose debris spreading low across the ground. Margit lands in a low, weighty recovery posture; the spectral hammer fades as he starts to rise.`},
+  {title:"Finisher · Comet Azur",detail:"Sustained beam, collapse, and dissolution",prompt:finisherActionA},
+];
+const composeDuelPrompt = action => action.includeGlobal===false
+  ? action.prompt
+  : `${duelTemplate}\n\nCURRENT_ACTION: ${action.prompt}`;
+const finisherPromptB = composeDuelPrompt({prompt:finisherActionB});
+const postBattlePrompt = composeDuelPrompt({
+  includeGlobal:false,
+  prompt:`Continuous third-person action-RPG gameplay on the same weathered stone causeway before Stormveil Castle in overcast daylight. Use the same normal elevated camera behind the lone Tarnished in practical weathered steel plate, chainmail, a worn muted dark-red cloak and a closed plain knight helmet. The Tarnished lowers the glintstone staff, relaxes the shoulders and stands quietly before the empty gray-green flagstones. The last faint pale-gold motes drift away and disappear, leaving only diffuse daylight and wind moving the cloak, dust, weeds and damaged wooden barricades. The causeway remains empty with no other character, no new attack, no repeated death effect, no cinematic cut, no HUD, generated lettering, logos or watermarks.`,
+});
+const duelNextPrompts = index => index===9
+  ? [finisherPromptB,postBattlePrompt]
+  : index===0 ? [duelPrompt(0)] : [idlePrompt];
+let duelSelection = 0;
+let selectDuelAction=()=>{},latestDuelActionVersion=0,battleEnded=false,victoryTimer=null;
+const duelVersionActions=new Map();
+const duelPrompt = index => composeDuelPrompt(duelActions[index]);
+const idlePrompt = duelPrompt(0);
+const gameConfig = window.SPECULATIVE_SAMPLING_GAME || {
+  title:"Margit Duel",
+  tagline:"Start in the guarded standoff, then choose an action at any time during playback.",
+  actionLabel:"Choose the next duel action",
+  actionHelp:"Actions play once, then automatically return to the guarded standoff. The finisher ends the battle.",
+  restartLabel:"Challenge again",
+  victoryText:"GREAT ENEMY FELLED",
+  referenceError:"Unable to load the Margit reference image",
+  globalPrompt:duelTemplate,
+  idleAction:0,
+  actions:duelActions.map((action,index)=>index===9
+    ? {...action,terminal:true,followups:[{prompt:finisherActionB},{prompt:postBattlePrompt,includeGlobal:false,composed:true}]}
+    : action),
+};
+const gameActions=gameConfig.actions;
+const gameIdleAction=Number.isInteger(gameConfig.idleAction)?gameConfig.idleAction:0;
+const composeGamePrompt=action=>action.composed||action.includeGlobal===false
+  ? action.prompt
+  : `${gameConfig.globalPrompt}\n\nCURRENT_ACTION: ${action.prompt}`;
+const gamePrompt=index=>composeGamePrompt(gameActions[index]);
+const gameIdlePrompt=gamePrompt(gameIdleAction);
+const terminalAction=gameActions.find(action=>action.terminal);
+const gamePostBattlePrompt=terminalAction?.followups?.length
+  ? composeGamePrompt(terminalAction.followups.at(-1)) : null;
+const gameNextPrompts=index=>{
+  const action=gameActions[index];
+  if(action.followups?.length)return action.followups.map(composeGamePrompt);
+  return [index===gameIdleAction?gamePrompt(index):gameIdlePrompt];
+};
+let token = new URLSearchParams(location.hash.slice(1)).get("token") || sessionStorage.getItem("h3Token") || "";
+if (token) sessionStorage.setItem("h3Token", token);
+// Keep token in fragment (never sent in an HTTP URL, logs or Referer).
+let session = null, running = false, epoch = 0, imageData = null, serverState = null;
+let cursor = 0, played = 0, displayedVersion = 0, frames = [], nextAudioAt = 0, received = 0;
+let audio = null, gain = null, sources = new Set(), heartbeatBusy = false;
+let socket=null, authenticated=false, rpcId=0, pending=new Map(), decodeQueue=Promise.resolve();
+let reconnectTimer=null,reconnectAttempt=0,allowReconnect=true;
+let underruns=0, playbackStartedAt=null;
+let startupBuffer=new H3StartupBuffer();
+let promptSubmissions=[],displayTransitions=[];
+let lastServerEcho=null,lastServerReceivedAt=0;
+let transport="websocket",rtcPeer=null,rtcMaps=new Map(),rtcPresented=new Map(),rtcCallback=null;
+let rtcState="new",rtcStats=null,rtcLastHold=false,rtcFramesPresented=0,starting=false,rtcLastMappedAt=0;
+let rtcFailure=null,rtcHistory=[],rtcLastTimestamp=null,rtcLastReceivedTimestamp=null,rtcRoute=null;
+let rtcJitterTargetApplied=[];
+let leadDirty=false;
+let latency=new H3Latency();
+// Opt-in benchmark telemetry. Raw timestamps use the browser monotonic clock.
+let benchEvents=[],benchStallStart=null,lastFrameEndAt=null,benchLastFrame=null;
+const benchEvent=(event,fields={})=>{
+  if(window.h3RunConfig)benchEvents.push({event,at:performance.now(),...fields});
+};
+function benchStall(active, at=performance.now()){
+  if(!window.h3RunConfig)return;
+  if(active && benchStallStart===null){benchStallStart=at;benchEvent("stall_start",{at,reason:"output_underflow"});}
+  if(!active && benchStallStart!==null){benchEvent("stall_end",{at});benchStallStart=null;}
+}
+const rtcVideo=$("rtcVideo");
+const screen = $("screen"), paint = screen.getContext("2d", {alpha:false});
+
+async function api(path, body) {
+  if(body!==undefined && authenticated && socket?.readyState===WebSocket.OPEN){
+    const id=++rpcId;
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{pending.delete(id);reject(Error("command timed out"));},30000);
+      pending.set(id,{resolve,reject,timer});
+      socket.send(JSON.stringify({type:"command",id,path,body}));
+    });
+  }
+  const r = await fetch(path, {method:body === undefined ? "GET":"POST",
+    headers:{"Authorization":"Bearer "+token, "Content-Type":"application/json"},
+    ...(body === undefined ? {}:{body:JSON.stringify(body)})});
+  const data = await r.json();
+  if (!r.ok) throw Error(data.error || ("HTTP "+r.status));
+  return data;
+}
+function bytes(text) {
+  const s = atob(text), result = new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++) result[i] = s.charCodeAt(i);
+  return result;
+}
+function notice(message) { $("notice").textContent = message || ""; }
+let duelReferenceLoading=null;
+async function loadDuelReference(){
+  if(!duelUI||imageData)return;
+  if(!duelReferenceLoading)duelReferenceLoading=(async()=>{
+    const response=await fetch("/api/reference",{headers:{"Authorization":"Bearer "+token}});
+    if(!response.ok)throw Error(gameConfig.referenceError||"Unable to load the game reference image");
+    const blob=await response.blob();
+    imageData=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    $("reference").src=imageData;$("reference").hidden=false;
+  })();
+  return duelReferenceLoading;
+}
+function configureDuelUI(){
+  if(!duelUI)return;
+  duelSelection=gameIdleAction;
+  document.title=`${gameConfig.title} · SpeculativeSampling`;
+  $("demoTitle").textContent=`${gameConfig.title} · SpeculativeSampling`;
+  $("onscreen").textContent=gameConfig.tagline||"Choose an action at any time during playback.";
+  $("gameActionLabel").textContent=gameConfig.actionLabel||"Choose the next action";
+  $("gameActionHelp").textContent=gameConfig.actionHelp||"Actions play once, then return to idle.";
+  $("victory").textContent=gameConfig.victoryText||"COMPLETE";
+  $("battleOverText").textContent=gameConfig.battleOverText||"Game over";
+  $("restartDuel").textContent=gameConfig.restartLabel||"Restart";
+  $("promptEditor").hidden=true;
+  $("duelControls").hidden=false;
+  $("send").hidden=true;
+  selectDuelAction=index=>{
+    duelSelection=index;
+    $("prompt").value=gamePrompt(index);
+    for(const [i,button] of [...$("duelActions").children].entries())
+      button.classList.toggle("selected",i===index);
+  };
+  $("duelActions").replaceChildren(...gameActions.map((action,index)=>{
+    const button=document.createElement("button");
+    button.type="button";button.className="duel-action"+(action.terminal?" terminal":"");
+    const number=document.createElement("span");number.className="duel-number";number.textContent=String(index+1).padStart(2,"0");
+    const text=document.createElement("span"),title=document.createElement("strong"),detail=document.createElement("small");
+    title.textContent=action.title;detail.textContent=action.detail;text.append(title,detail);
+    button.append(number,text);
+    button.onclick=async()=>{
+      if(battleEnded)return;
+      selectDuelAction(index);
+      if(running){
+        const result=await submitCurrentPrompt(gameNextPrompts(index));
+        if(result){
+          latestDuelActionVersion=result.version;
+          duelVersionActions.set(result.version,index);
+          if(action.terminal)for(const item of $("duelActions").children)item.disabled=true;
+        }
+      }
+      else notice(`Action ${index+1} selected. Click Start when ready.`);
+    };
+    return button;
+  }));
+  selectDuelAction(duelSelection);
+}
+configureDuelUI();
+if(duelUI)loadDuelReference().catch(error=>notice(error.message));
+function setBattleControls(ended){
+  if(!duelUI)return;
+  battleEnded=ended;
+  $("duelActions").hidden=ended;
+  $("battleOver").hidden=!ended;
+  for(const button of $("duelActions").children)button.disabled=ended;
+  if(!ended){
+    if(victoryTimer!==null)clearTimeout(victoryTimer);
+    victoryTimer=null;$("victory").hidden=true;
+  }
+}
+function observeDuelPlayback(version){
+  if(!duelUI||!version)return;
+  const prompt=serverState?.session_state?.prompts?.[version];
+  if(prompt===gameIdlePrompt && version>=latestDuelActionVersion)selectDuelAction(gameIdleAction);
+  if(gamePostBattlePrompt && prompt===gamePostBattlePrompt && !battleEnded){
+    setBattleControls(true);
+    $("victory").hidden=false;
+  }
+}
+function milliseconds(value){
+  if(!Number.isFinite(value))return "—";
+  return value>=1000 ? (value/1000).toFixed(2)+" s" : value.toFixed(0)+" ms";
+}
+function renderController(){
+  const data=serverState||{},s=data.session_state;
+  if(!s){
+    $("controllerSummary").textContent="Waiting for session";
+    for(const id of ["produceState","consumeState"])$(id).className="state-node";
+    return;
+  }
+  const task=s.inflight,active=!s.stopped&&!s.error;
+  const consuming=active && (played<s.committed_frame || s.committed_frame>0);
+  $("produceState").className="state-node "+(task?"active":"");
+  $("consumeState").className="state-node "+(consuming?"active":active?"waiting":"");
+  $("stateArrow").className="state-arrow "+(task&&consuming?"active":"");
+  $("produceDetail").textContent=task ? `P${task.prompt_version} · ${task.action} · proposal ${task.proposal}` : "Idle · using generated content";
+  $("consumeDetail").textContent=s.stopped ? "Stopped" : consuming ? `Playing ${(played/24).toFixed(2)}s · committed ${(s.committed_frame/24).toFixed(2)}s` : "Waiting for playable media";
+  $("controllerSummary").textContent=`P${s.latest_prompt_version} received · P${s.generated_prompt_version} generated`;
+  $("controllerAction").textContent=task ? `${task.action} · P${task.prompt_version}` : s.stopped?"stopped":"consume / idle";
+
+  const family=data.model_family;
+  if(family==="ltx_dmd" || family==="wan_cfpp")
+    $("controllerReuse").textContent=task?.action==="rewrite" ? "Forked KV, awaiting promotion" : "Retained KV";
+  else if(s.mode==="image")
+    $("controllerReuse").textContent=task?.anchor ? `Boundary RGB @ ${(task.boundary/24).toFixed(2)}s` :
+      s.generated_prompt_version>1 ? "Boundary RGB reused" : "Initial reference";
+  else if(s.mode==="relay")
+    $("controllerReuse").textContent=task?.relay_context ? "Phase-aligned latent window" : "Initial reference";
+  else $("controllerReuse").textContent=task?.anchor ? "Boundary latent" : "Initial reference";
+  const discarded=s.discarded_future_frames||0;
+  $("controllerDiscard").textContent=discarded ? `Discarded ${discarded} old-future frames` : s.reserved_rewrite_boundary!=null ? `Cut frozen @ ${(s.reserved_rewrite_boundary/24).toFixed(2)}s` : "No future to discard";
+  const sender=data.rtc?.media_source;
+  $("controllerSender").textContent=!sender ? "Waiting for connection" :
+    `commit ${sender.committed_frame} · pending ${sender.sender_pending_frames} · hold ${sender.hold_frames}`;
+
+  const start=Math.max(0,Math.min(played,s.committed_frame||played)-24);
+  const taskEnd=task ? task.boundary+(task.proposal_frames||s.proposal_frames||124) : 0;
+  const end=Math.max(start+Math.min(240,s.proposal_frames||124),s.horizon_frame||0,taskEnd);
+  const span=Math.max(1,end-start);
+  const place=(id,a,b,show=true)=>{
+    const el=$(id),left=Math.max(0,Math.min(1,(a-start)/span));
+    const right=Math.max(left,Math.min(1,(b-start)/span));
+    el.style.left=(left*100)+"%";el.style.width=((right-left)*100)+"%";el.hidden=!show||right<=left;
+  };
+  place("productionSegment",task?.boundary||0,taskEnd,!!task);
+  place("readySegment",s.committed_frame||0,s.horizon_frame||0,(s.horizon_frame||0)>(s.committed_frame||0));
+  place("committedSegment",played,s.committed_frame||0,(s.committed_frame||0)>played);
+  place("playedSegment",start,played,played>start);
+  const marker=(id,value,show)=>{
+    const el=$(id),ratio=Math.max(0,Math.min(1,(value-start)/span));
+    el.style.left=(112+ratio*Math.max(1,$("controllerTimeline").clientWidth-112))+"px";el.hidden=!show;
+  };
+  marker("controllerPlayhead",played,active||played>0);
+  marker("controllerBoundary",s.reserved_rewrite_boundary??task?.boundary??0,s.reserved_rewrite_boundary!=null||!!task);
+  $("timelineStart").textContent=(start/24).toFixed(1)+"s";
+  $("timelineEnd").textContent=(end/24).toFixed(1)+"s";
+
+  const labels={production_start:"PRODUCE",production_chunk:"READY",production_ready:"COMPLETE",commit:"COMMIT",prompt_received:"UPDATE",production_cancelled:"DISCARD",session_stop:"STOP",error:"ERROR"};
+  const events=(s.recent_controller_events||[]).filter(e=>labels[e.event]).reduce((items,event)=>{
+    const key=event.event+":"+(event.proposal??"");
+    const previous=items.findIndex(item=>item.key===key);
+    if(previous>=0)items.splice(previous,1);
+    items.push({key,event});return items;
+  },[]).slice(-7).map(item=>item.event);
+  $("controllerEvents").replaceChildren(...events.map(e=>{
+    const el=document.createElement("span"),suffix=e.proposal==null?"":` #${e.proposal}`;
+    el.textContent=labels[e.event]+suffix;return el;
+  }));
+  const last=events[events.length-1];
+  $("controllerDecision").textContent=!last?"No commit decision yet":
+    last.event==="commit"?`COMMIT · [${last.commit_start}, ${last.commit_end}) entered the irreversible playback prefix`:
+    last.event==="production_cancelled"?`DISCARD · uncommitted future from proposal ${last.proposal} was discarded`:
+    last.event==="production_start"?`PRODUCE · preparing new future from safe boundary ${(task?.boundary||0)/24}s`:
+    `${labels[last.event]} · controller state updated`;
+}
+function renderLatency(){
+  const s=serverState?.session_state, sample=latency.latest();
+  const metrics=s?.proposal_metrics||[];
+  const matched=sample && metrics.find(m=>m.proposal===sample.proposal);
+  const metric=matched || metrics[metrics.length-1], stages=metric?.stages||{};
+  $("e2eLatency").textContent=sample ? milliseconds(sample.e2eMs) : "—";
+  $("latencyVersion").textContent=sample ?
+    `P${sample.version} · first presentation measured${running?"":" · latest run"}` : "Waiting for this page to submit and display its first frame";
+  $("queueLatency").textContent=milliseconds(metric?.queue_s==null ? null : metric.queue_s*1000);
+  $("firstLatency").textContent=milliseconds(metric?.first_ready_s==null ? null : metric.first_ready_s*1000);
+  $("commitLatency").textContent=milliseconds(metric?.first_commit_s==null ? null : metric.first_commit_s*1000);
+  $("totalLatency").textContent=milliseconds(metric?.total_s==null ? null : metric.total_s*1000);
+  const queue=metric?.queue_s==null?null:metric.queue_s*1000;
+  const generation=metric?.first_ready_s==null?null:metric.first_ready_s*1000;
+  const delivery=sample&&matched&&queue!=null&&generation!=null ? Math.max(0,sample.e2eMs-queue-generation):null;
+  const path=[queue,generation,delivery],pathTotal=path.every(Number.isFinite)?path.reduce((a,v)=>a+v,0):null;
+  for(const [id,value,bar] of [["queuePath",queue,"queueBar"],["generatePath",generation,"generateBar"],["deliverPath",delivery,"deliverBar"]]){
+    $(id).textContent=milliseconds(value);
+    $(bar).style.width=pathTotal>0?(value/pathTotal*100)+"%":"0%";
+  }
+  $("timingProposal").textContent=metric ?
+    `Stage timing: P${metric.prompt_version} / proposal ${metric.proposal} · ${matched?"matches first presentation above":"latest production"} · `+
+    (metric.mock?"MOCK: no model-stage timing":metric.total_s==null?"in progress; stage values update on completion":"complete") :
+    "Stage timing: waiting for server data";
+  for(const [id,key] of [["textLatency","text"],["conditionLatency","condition"],["ditLatency","dit"],
+                         ["audioVaeLatency","audio_vae"],["videoVaeLatency","video_vae"]])
+    $(id).textContent=milliseconds(stages[key]?.gpu_s==null ? null : stages[key].gpu_s*1000);
+  $("ditSummary").textContent=milliseconds(stages.dit?.gpu_s==null ? null : stages.dit.gpu_s*1000);
+  const prep=[stages.audio_prepare,stages.video_prepare].filter(Boolean);
+  $("mediaLatency").textContent=milliseconds(prep.length ? prep.reduce((a,v)=>a+v.wall_s*1000,0):null);
+  $("persistLatency").textContent=milliseconds(stages.persist?.wall_s==null ? null:stages.persist.wall_s*1000);
+  $("rttLatency").textContent=milliseconds(s?.transport_rtt_s>0?s.transport_rtt_s*1000:null);
+  $("decodeLabel").textContent=transport==="rtc"?"RTC video decode · per-frame mean":"Local decode preparation · per frame";
+  $("bufferLabel").textContent=transport==="rtc"?"RTC jitter buffer · mean":"Local queue to render";
+  $("decodeLatency").textContent=milliseconds(transport==="rtc"?latency.rtcDecodeMs:latency.clientDecodeMs);
+  $("clientBufferLatency").textContent=milliseconds(transport==="rtc"?latency.rtcBufferMs:latency.clientBufferMs);
+  $("promptLatencies").replaceChildren(...latency.rows(s).map(row=>{
+    const el=document.createElement("span");
+    el.textContent=`P${row.version} · ${row.e2eMs===null?row.status:milliseconds(row.e2eMs)}`;
+    el.title=`Submission to acknowledgment (including server processing): ${milliseconds(row.ackMs)}`;
+    return el;
+  }));
+}
+function resetPlayback() {
+  benchStall(false);lastFrameEndAt=null;benchLastFrame=null;
+  epoch++; running = false; cursor=0; played=0; received=0; displayedVersion=0; nextAudioAt=0;
+  underruns=0;playbackStartedAt=null;
+  startupBuffer.clear();
+  startupBuffer=new H3StartupBuffer(serverState?.websocket_startup_frames || 0);
+  promptSubmissions=[];displayTransitions=[];
+  for(const item of frames) item.bitmap.close();
+  frames=[];
+  for(const source of sources) { try{source.stop();}catch{} }
+  sources.clear();
+  if(rtcCallback!==null)rtcVideo.cancelVideoFrameCallback(rtcCallback);
+  rtcCallback=null;
+  if(rtcPeer){const peer=rtcPeer;rtcPeer=null;peer.close();}
+  rtcVideo.pause();rtcVideo.srcObject=null;
+  rtcMaps.clear();rtcPresented.clear();rtcState="new";rtcStats=null;rtcLastHold=false;
+  rtcFramesPresented=0;rtcLastMappedAt=0;
+}
+async function enableAudio() {
+  if(!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    gain = audio.createGain(); gain.gain.value = Number($("volume").value); gain.connect(audio.destination);
+  }
+  await audio.resume();
+}
+function showStatus(data) {
+  serverState=data;
+  const isLtx=data.model_family==="ltx_dmd";
+  const isWan=data.model_family==="wan_cfpp";
+  const acceptsImage=data.conditioning?.image!==false;
+  const vaeBackends=Array.isArray(data.vae_backends)?data.vae_backends:[];
+  const vaeSignature=vaeBackends.join(",");
+  if($('vaeBackend').dataset.backends!==vaeSignature){
+    const labels={"original":"Original streaming VAE","sol-h3-vae":"Sol-H3 TAE + causal decoder"};
+    $('vaeBackend').replaceChildren(...vaeBackends.map(value=>new Option(labels[value]||value,value)));
+    $('vaeBackend').dataset.backends=vaeSignature;
+    const selectedBackend=data.session_vae_backend||data.default_vae_backend;
+    if(vaeBackends.includes(selectedBackend))$('vaeBackend').value=selectedBackend;
+  }
+  $('vaeControls').hidden=vaeBackends.length<2;
+  $("referenceControls").hidden=!acceptsImage;
+  if(!acceptsImage)imageData=null;
+  if(isLtx){
+    $("demoTitle").textContent="LTX / Live Frame-wise";
+    $("profileLabel").textContent=`K${data.chunk_latents} · ${data.rollout} · USP${data.usp_size} · ${data.resolution.width}×${data.resolution.height}@${data.resolution.fps}fps`;
+    if(!$("mode").dataset.ltx){
+      $("mode").replaceChildren(new Option("Native ReRoPE KV + SpeculativeSampling · Automatic", "latent", true, true));
+      $("mode").dataset.ltx="true";
+      document.querySelector('label[for="mode"]').textContent="Continuation state";
+      $("modeHint").textContent="The generator manages native KV; the system controller only selects retain_until and commits or discards the prediction suffix.";
+    }
+    $("policyControls").hidden=false;
+  }
+  if(isWan){
+    $("demoTitle").textContent="Wan / Live Frame-wise";
+    $("profileLabel").textContent=`K${data.chunk_latents} · native CF++ KV · 1×B300 · ${data.resolution.width}×${data.resolution.height}@${data.resolution.fps}fps`;
+    if(!$("mode").dataset.wan){
+      $("mode").replaceChildren(new Option("Native CF++ KV + SpeculativeSampling · Automatic", "latent", true, true));
+      $("mode").dataset.wan="true";
+      document.querySelector('label[for="mode"]').textContent="Continuation state";
+      $("modeHint").textContent="The generator manages official/speculative causal KV; the system controller only selects retain_until and commits or discards the prediction suffix.";
+    }
+    $("policyControls").hidden=false;
+    $("mediaHint").textContent="Default WebRTC: H.264 + Opus. Wan jointly samples one native-K proposal; cached VAE fully decodes it and delivery begins at q=1. Unaccepted future KV and decoder forks are discarded.";
+  }
+  if(window.h3RunConfig){
+    const c=window.h3RunConfig;
+    $("profileLabel").textContent=`${c.serving_policy} · ${c.duration}s proposal · ${c.generation_width}×${c.generation_height} generation`;
+    $("totalHint").textContent=`Production starts → ${data.session_state?.proposal_frames ?? (c.duration===5?124:243)} frames ready`;
+    $("mediaHint").textContent=`Measurement mode: model generation is ${c.generation_width}×${c.generation_height}; `+
+      `preview width is ${data.preview_width}px over WebSocket JPEG+PCM; boundary latents continue directly without RGB re-encoding. `+
+      `Page E2E measures browser submission to display; production serving metrics use separate clock mapping.`;
+  }
+  $("health").textContent = data.error ? "Error" : !authenticated ? "Connecting" :
+    data.ready ? (data.mock ? "MOCK · no model":"Model ready") : "Warming up model";
+  const s=data.session_state;
+  if(!s&&!leadDirty&&document.activeElement!==$("leadSeconds")){
+    const rewriteLead=Number(data.live_scheduling?.condition_ready_to_first_commit_seconds);
+    const continueLead=Number(data.live_scheduling?.continuation_to_first_commit_seconds);
+    if(Number.isFinite(rewriteLead)&&Math.abs(rewriteLead-continueLead)<1e-6)
+      $("leadSeconds").value=rewriteLead.toFixed(2);
+  }
+  $("start").disabled = starting || !authenticated || !data.ready || data.model_busy ||
+    ($("transport").value==="rtc" && !data.rtc?.available) || (s && !s.stopped && !s.error);
+  $("stop").disabled = !s || s.stopped;
+  $("send").disabled = !running;
+  $("leadControls").hidden=isLtx||isWan;
+  $("applyLead").disabled=isLtx||isWan||!authenticated||!data.ready;
+  $("mode").disabled = isLtx || isWan || running; $("upload").disabled=running||!acceptsImage; $("seed").disabled=running;
+  $("vaeBackend").disabled=running||starting;
+  $("policy").disabled=running||starting;
+  $("transport").disabled=running||starting;
+  $("transport").querySelector('[value="rtc"]').disabled=!data.rtc?.available;
+  if(!running&&!data.rtc?.available&&$("transport").value==="rtc")$("transport").value="websocket";
+  $("rtcHint").textContent=data.rtc?.available ?
+    `RTC enabled · ${data.rtc.width}px wide · ${rtcState}. Requires a reachable media path or TURN; SSH does not carry RTC media.` :
+    "RTC is not enabled on this tunnel; the WebSocket fallback is selected automatically.";
+  if(s) {
+    $("buffer").textContent=(s.stopped ? 0 : Math.max(0,s.buffer_s)).toFixed(2)+"s";
+    const ema=s.timeline_extension?.ema;
+    if(ema){
+      const margin=ema.margin_seconds||0;
+      const rewriteLead=ema.condition_value_seconds+margin;
+      const continueLead=ema.continuation_value_seconds+margin;
+      if(document.activeElement!==$("leadSeconds")&&!leadDirty&&Math.abs(rewriteLead-continueLead)<1e-6)
+        $("leadSeconds").value=rewriteLead.toFixed(2);
+      $("budget").textContent=Math.abs(rewriteLead-continueLead)<1e-6 ?
+        rewriteLead.toFixed(2)+"s" :
+        `Rewrite ${rewriteLead.toFixed(2)}s · continue ${continueLead.toFixed(2)}s`;
+      $("budget").title=`Independent rewrite/continuation leads; rewrite samples ${ema.condition_observations} · continuation samples ${ema.continuation_observations} · α=${ema.alpha} · margin ${margin.toFixed(2)}s`;
+    }else if(s.scheduling_estimates){
+      const estimate=s.scheduling_estimates;
+      const margin=estimate.margin_seconds||0;
+      $("budget").textContent=`Rewrite ${(estimate.condition_seconds+margin).toFixed(2)}s · continue ${(estimate.continuation_seconds+margin).toFixed(2)}s`;
+      $("budget").title="Scheduling lead is initialized by the model deployment config; rewrite and retained-KV continuation update separate online EMAs";
+    }else{
+      $("budget").textContent=s.budget_s.toFixed(2)+"s";
+      $("budget").title="Legacy-runtime compatibility: dynamic production budget";
+    }
+    const task=s.inflight;
+    $("stage").textContent = s.error ? "Production failed: "+s.error :
+      s.stopped ? "Stopped" :
+      !s.client_online && !running ? "Previous session paused; click Stop before starting again." :
+      `Received P${s.latest_prompt_version} · `+
+      (task ? `producing P${task.prompt_version}, reserved handoff at ${(task.boundary/24).toFixed(3)}s` :
+        `generated P${s.generated_prompt_version}, buffered for delivery`);
+    if(displayedVersion) $("onscreen").textContent = `Playing P${displayedVersion}: `+(s.prompts[displayedVersion] || "");
+  }
+  renderController();
+  if(data.error) notice(data.error);
+  renderLatency();
+}
+async function enqueue(unit, runEpoch) {
+  const prepareStarted=performance.now();
+  const decoded = await Promise.all(unit.frames.map(async value =>
+    createImageBitmap(new Blob([bytes(value)], {type:"image/jpeg"}))));
+  if(runEpoch !== epoch || !running) {decoded.forEach(b=>b.close());return;}
+  const raw=bytes(unit.audio), view=new DataView(raw.buffer);
+  const n=raw.byteLength/2/unit.channels;
+  const buf=audio.createBuffer(unit.channels,n,unit.sample_rate);
+  for(let c=0;c<unit.channels;c++){
+    const channel=buf.getChannelData(c);
+    for(let i=0;i<n;i++) channel[i]=view.getInt16((i*unit.channels+c)*2,true)/32768;
+  }
+  const preparedAt=performance.now();
+  latency.clientDecodeMs=(preparedAt-prepareStarted)/unit.frames.length;
+  received=unit.end;
+  const ready=startupBuffer.push({unit,decoded,buf,preparedAt});
+  for(const packet of ready)schedulePrepared(packet);
+}
+function schedulePrepared({unit,decoded,buf,preparedAt}) {
+  let when=nextAudioAt;
+  if(when < audio.currentTime+.025) {
+    if(nextAudioAt>0) {underruns++;notice("Buffer underrun: waiting for new content while holding the boundary frame.");}
+    when=audio.currentTime+.65;
+    if(playbackStartedAt===null)playbackStartedAt=performance.now()+650;
+  }
+  const source=audio.createBufferSource();source.buffer=buf;source.connect(gain);
+  sources.add(source);source.onended=()=>sources.delete(source);source.start(when);
+  decoded.forEach((bitmap,i)=>frames.push({
+    bitmap, at:when+i/24, endAt:when+(i+1)/24, absolute:unit.start+i,
+    prompt_version:unit.prompt_version,
+    proposal:unit.proposal,preparedAt,
+  }));
+  nextAudioAt=when+(unit.end-unit.start)/24;
+}
+function render() {
+  if(running && audio && transport==="websocket") {
+    const now=audio.currentTime;
+    let newest=null;
+    while(frames.length && frames[0].at<=now){
+      if(newest) newest.bitmap.close();
+      newest=frames.shift();
+    }
+    if(newest){
+      if(screen.width!==newest.bitmap.width || screen.height!==newest.bitmap.height){
+        screen.width=newest.bitmap.width;screen.height=newest.bitmap.height;
+      }
+      paint.drawImage(newest.bitmap,0,0);newest.bitmap.close();
+      played=Math.max(played,newest.absolute+1);
+      const shownAt=performance.now();
+      benchStall(false,shownAt);
+      lastFrameEndAt=newest.endAt;
+      benchLastFrame={at:shownAt,frame:newest.absolute,proposal:newest.proposal,
+        version:newest.prompt_version};
+      benchEvent("display",benchLastFrame);
+      latency.clientBufferMs=shownAt-newest.preparedAt;
+      latency.observe(newest.prompt_version,newest.proposal,shownAt);
+      if(displayedVersion!==newest.prompt_version){
+        displayTransitions.push({version:newest.prompt_version,frame:newest.absolute,at:performance.now()});
+        observeDuelPlayback(newest.prompt_version);
+      }
+      displayedVersion=newest.prompt_version;
+      $("playtime").textContent=(played/24).toFixed(2)+"s";
+      if(received-played>8) notice("");
+    }
+    if(!newest && played>0 && lastFrameEndAt!==null && now>=lastFrameEndAt &&
+       (!frames.length || frames[0].at>now)){
+      benchStall(true,performance.now()-Math.max(0,now-lastFrameEndAt)*1000);
+    }
+  }
+  requestAnimationFrame(render);
+}
+function applyRtcFrame(timestamp){
+  const info=rtcMaps.get(timestamp), shown=rtcPresented.get(timestamp);
+  if(!info || shown===undefined)return;
+  rtcMaps.delete(timestamp);rtcPresented.delete(timestamp);
+  rtcLastMappedAt=performance.now();
+  if(info.frame_end<played)return;
+  if(info.hold && !rtcLastHold && played>0)underruns++;
+  rtcLastHold=info.hold;
+  if(info.frame_end>0 && playbackStartedAt===null)playbackStartedAt=shown;
+  if(info.frame_end>0 && !info.hold)latency.observe(info.prompt_version,info.proposal,shown);
+  played=Math.max(played,info.frame_end);
+  if(info.frame_end>0 && displayedVersion!==info.prompt_version){
+    displayTransitions.push({version:info.prompt_version,frame:info.frame_end-1,at:shown});
+    observeDuelPlayback(info.prompt_version);
+    displayedVersion=info.prompt_version;
+  }
+  $("playtime").textContent=(played/24).toFixed(2)+"s";
+  if(info.hold && played>0)notice("RTC buffer underrun: holding the boundary frame and temporarily muting audio.");
+  else if(played>0)notice("");
+}
+function onRtcVideoFrame(now, metadata){
+  if(!running || transport!=="rtc")return;
+  if(!Number.isFinite(metadata.rtpTimestamp)){
+    failRtc("The browser did not provide RTP frame timestamps, so playback position cannot be reported safely. Use a compatible Chrome version.");return;
+  }
+  rtcFramesPresented++;
+  rtcLastTimestamp=metadata.rtpTimestamp;
+  rtcPresented.set(metadata.rtpTimestamp,now);
+  if(rtcPresented.size>256)rtcPresented.delete(rtcPresented.keys().next().value);
+  applyRtcFrame(metadata.rtpTimestamp);
+  rtcCallback=rtcVideo.requestVideoFrameCallback(onRtcVideoFrame);
+}
+function failRtc(message){
+  if(!running)return;
+  rtcFailure={message,played,received,displayedVersion,rtcFramesPresented,rtcLastTimestamp,rtcLastReceivedTimestamp,
+    rtcStats,rtcState,rtcRoute,history:rtcHistory.slice(-12),at:performance.now()};
+  const sid=session;resetPlayback();notice(message+" Transport was not switched automatically; stop the session to select the WebSocket fallback.");
+  api("/api/stop",{session:sid}).catch(()=>{});
+}
+function applyRtcJitterTarget(peer){
+  const seconds=Number(serverState?.rtc?.jitter_target_seconds);
+  rtcJitterTargetApplied=[];
+  if(!Number.isFinite(seconds))return;
+  // RTCRtpReceiver.jitterBufferTarget is a DOMHighResTimeStamp in
+  // milliseconds, while the serving policy is expressed in seconds.
+  const targetMs=seconds*1000;
+  for(const receiver of peer.getReceivers()){
+    if(!receiver.track || !("jitterBufferTarget" in receiver))continue;
+    try{
+      receiver.jitterBufferTarget=targetMs;
+      rtcJitterTargetApplied.push({kind:receiver.track.kind,targetMs});
+    }catch(e){rtcJitterTargetApplied.push({kind:receiver.track.kind,error:String(e)});}
+  }
+}
+async function startRtc(){
+  if(!window.RTCPeerConnection || !rtcVideo.requestVideoFrameCallback)
+    throw Error("This browser does not support the required WebRTC playback-feedback API");
+  const runEpoch=epoch;
+  const peer=rtcPeer=new RTCPeerConnection(serverState.rtc.ice_config||{iceServers:[]});
+  const stream=new MediaStream();
+  rtcVideo.srcObject=stream;rtcVideo.volume=Number($("volume").value);
+  peer.addTransceiver("video",{direction:"recvonly"});
+  peer.addTransceiver("audio",{direction:"recvonly"});
+  peer.ontrack=event=>{
+    if(epoch!==runEpoch)return;
+    stream.addTrack(event.track);
+    applyRtcJitterTarget(peer);
+    rtcVideo.play().catch(()=>{
+      if(epoch===runEpoch && running)notice("Click the video area to allow audio and video playback.");
+    });
+  };
+  peer.onconnectionstatechange=()=>{
+    if(epoch!==runEpoch)return;
+    rtcState=peer.connectionState;
+    if(rtcState==="failed" || rtcState==="closed")
+      failRtc("RTC media connection interrupted: check ICE/TURN; the SSH tunnel does not carry media");
+  };
+  await peer.setLocalDescription(await peer.createOffer());
+  if(peer.iceGatheringState!=="complete"){
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{peer.removeEventListener("icegatheringstatechange",check);reject(Error("RTC ICE gathering timed out"));},12000);
+      function check(){if(peer.iceGatheringState==="complete"){clearTimeout(timer);peer.removeEventListener("icegatheringstatechange",check);resolve();}}
+      peer.addEventListener("icegatheringstatechange",check);check();
+    });
+  }
+  if(epoch!==runEpoch)throw Error("RTC start cancelled");
+  const answer=await api("/api/rtc/offer",{session,type:peer.localDescription.type,sdp:peer.localDescription.sdp});
+  if(epoch!==runEpoch)throw Error("RTC start cancelled");
+  await peer.setRemoteDescription(answer);
+  applyRtcJitterTarget(peer);
+  rtcCallback=rtcVideo.requestVideoFrameCallback(onRtcVideoFrame);
+  const timer=setTimeout(()=>{
+    if(epoch===runEpoch && peer.connectionState!=="connected")
+      failRtc("RTC connection timed out: this network requires a reachable ICE candidate or TURN");
+  },15000);
+  peer.addEventListener("connectionstatechange",()=>{if(peer.connectionState==="connected")clearTimeout(timer);});
+}
+$("start").onclick=async()=>{
+  if(starting)return;starting=true;
+  const submittedAt=performance.now();
+  try{
+    if(duelUI){setBattleControls(false);selectDuelAction(gameIdleAction);latestDuelActionVersion=0;duelVersionActions.clear();}
+    await loadDuelReference();
+    await enableAudio();resetPlayback();notice("Preparing the first video segment…");$("start").disabled=true;
+    latency=new H3Latency();
+    transport=$("transport").value;
+    rtcFailure=null;rtcHistory=[];rtcLastTimestamp=null;rtcLastReceivedTimestamp=null;rtcRoute=null;
+    screen.hidden=transport==="rtc";rtcVideo.hidden=transport!=="rtc";
+    const initialPrompt=$("prompt").value;
+    const initialNextPrompts=duelUI?gameNextPrompts(duelSelection):[initialPrompt];
+    const s=await api("/api/start",{prompt:initialPrompt,next_prompts:initialNextPrompts,seed:Number($("seed").value),
+      mode:$("mode").value,image:imageData,transport,serving_policy:$("policy").value,
+      ...(window.h3RunConfig||{}),
+      vae_backend:$("vaeBackend").value||serverState?.default_vae_backend});
+    session=s.session;running=true;
+    try{
+      const requested=Number($("leadSeconds").value);
+      const lead=await api("/api/scheduling/lead",{session,condition_lead_seconds:requested,continuation_lead_seconds:requested});
+      $("leadSeconds").value=Number(lead.condition_lead_seconds).toFixed(2);leadDirty=false;
+    }catch(e){notice(`Session started, but the scheduling lead was not applied: ${e.message}`);}
+    benchEvents=[];benchStallStart=null;
+    benchEvent("session_started",{session});
+    latency.submit(1,submittedAt,performance.now());
+    promptSubmissions.push({version:1,at:submittedAt});
+    if(transport==="rtc")await startRtc();
+  }catch(e){
+    if(running && transport==="rtc")failRtc(e.message);else notice(e.message);
+  }finally{starting=false;}
+};
+async function submitCurrentPrompt(nextPrompts=null){
+  const submittedAt=performance.now();
+  const prompt=$("prompt").value;
+  try{const r=await api("/api/prompt",{session,prompt,
+        next_prompts:nextPrompts||[prompt]});
+      latency.submit(r.version,submittedAt,performance.now());
+      promptSubmissions.push({version:r.version,at:submittedAt});
+      notice(`Received P${r.version}; only the latest input is retained while busy.`);return r;}
+  catch(e){notice(e.message);return null;}
+}
+$("send").onclick=()=>submitCurrentPrompt();
+$("stop").onclick=async()=>{
+  try{
+    const sid=session || serverState?.session_state?.session;
+    resetPlayback();await api("/api/stop",{session:sid});session=null;notice("Delivery stopped; any sampling already in progress will finish naturally.");
+  }catch(e){notice(e.message);}
+};
+$("restartDuel").onclick=async()=>{
+  try{
+    const sid=session || serverState?.session_state?.session;
+    resetPlayback();
+    if(sid)await api("/api/stop",{session:sid});
+    session=null;setBattleControls(false);selectDuelAction(gameIdleAction);latestDuelActionVersion=0;duelVersionActions.clear();
+    notice("Preparing a new duel…");
+    for(let attempt=0;attempt<600;attempt++){
+      const status=await api("/api/status");showStatus(status);
+      if(status.ready&&!status.model_busy&&status.session_state?.stopped){$("start").click();return;}
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    notice("The previous generation is still winding down. Click Start when the model is ready.");
+  }catch(e){notice(e.message);}
+};
+$("prompt").onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter"&&running)$("send").click();};
+$("volume").oninput=()=>{if(gain)gain.gain.value=Number($("volume").value);rtcVideo.volume=Number($("volume").value);};
+$('applyLead').onclick=async()=>{
+  const requested=Number($("leadSeconds").value);
+  if(!Number.isFinite(requested)||requested<0.1||requested>10){notice("Scheduling lead must be between 0.1 and 10 seconds.");return;}
+  if(!session||serverState?.session_state?.stopped){
+    leadDirty=true;notice(`Scheduling lead set to ${requested.toFixed(2)}s; it will be applied when Start is clicked.`);return;
+  }
+  try{
+    const result=await api("/api/scheduling/lead",{session,condition_lead_seconds:requested,continuation_lead_seconds:requested});
+    $("leadSeconds").value=Number(result.condition_lead_seconds).toFixed(2);leadDirty=false;
+    notice(`Rewrite and continuation leads updated to ${Number(result.condition_lead_seconds).toFixed(2)}s; they apply from the next decision.`);
+  }catch(e){notice(e.message);}
+};
+$("leadSeconds").oninput=()=>{leadDirty=true;};
+rtcVideo.onclick=()=>rtcVideo.play().catch(e=>notice(e.message));
+$("upload").onchange=()=>{
+  const file=$("upload").files[0];if(!file)return;
+  if(file.size>8_000_000){notice("Reference images must be smaller than 8 MB");return;}
+  const reader=new FileReader();reader.onload=()=>{imageData=reader.result;$("reference").src=imageData;$("reference").hidden=false;};
+  reader.readAsDataURL(file);
+};
+function connectStream(){
+  if(!allowReconnect || socket?.readyState===WebSocket.OPEN || socket?.readyState===WebSocket.CONNECTING)return;
+  if(reconnectTimer!==null){clearTimeout(reconnectTimer);reconnectTimer=null;}
+  const wsURL=`${location.protocol==="https:"?"wss":"ws"}://${location.hostname}:${Number(location.port)+1}/`;
+  const current=new WebSocket(wsURL);socket=current;
+  current.onopen=()=>current.send(JSON.stringify({type:"auth",token}));
+  current.onmessage=event=>{
+    if(socket!==current)return;
+    const message=JSON.parse(event.data);
+    if(message.type==="authenticated"){
+      authenticated=true;reconnectAttempt=0;notice("");
+      api("/api/status").then(showStatus).catch(e=>notice(e.message));return;
+    }
+    if(message.type==="status"){
+      lastServerEcho=message.sent_monotonic;lastServerReceivedAt=performance.now();
+      showStatus(message.data);return;
+    }
+    if(message.type==="reply"){
+      const p=pending.get(message.id);if(!p)return;
+      pending.delete(message.id);clearTimeout(p.timer);
+      message.error?p.reject(Error(message.error)):p.resolve(message.result);return;
+    }
+    if(message.type==="rtc_frame"){
+      if(!running || transport!=="rtc" || message.session!==session)return;
+      received=Math.max(received,message.frame_end);cursor=received;
+      rtcLastReceivedTimestamp=message.rtp_timestamp;
+      rtcMaps.set(message.rtp_timestamp,message);
+      if(rtcMaps.size>256)rtcMaps.delete(rtcMaps.keys().next().value);
+      applyRtcFrame(message.rtp_timestamp);return;
+    }
+    if(message.type==="rtc_state"){
+      if(message.session===session){rtcState=message.state;if(rtcState==="failed")failRtc("RTC connection failed");}
+      return;
+    }
+    if(message.type==="units"){
+      if(transport!=="websocket")return;
+      const runEpoch=epoch;
+      decodeQueue=decodeQueue.then(async()=>{
+        if(!running || runEpoch!==epoch || message.session!==session)return;
+        for(const unit of message.units){
+          if(unit.start!==cursor)throw Error("Delivery timeline is discontinuous");
+          await enqueue(unit,runEpoch);
+          if(!running || runEpoch!==epoch)return;
+          cursor=unit.end;
+        }
+      }).catch(e=>notice(e.message));
+    }
+  };
+  current.onerror=()=>notice("The live connection is temporarily unavailable; reconnecting automatically…");
+  current.onclose=event=>{
+    if(socket!==current)return;
+    socket=null;
+    authenticated=false;
+    for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error("connection closed"));}
+    pending.clear();$("start").disabled=true;
+    const preserveRtc=running && transport==="rtc" && rtcPeer &&
+      rtcPeer.connectionState!=="failed" && rtcPeer.connectionState!=="closed";
+    if(!preserveRtc)resetPlayback();
+    if(!allowReconnect)return;
+    const delay=Math.min(5000,250*2**Math.min(reconnectAttempt++,5));
+    const detail=event.code===1008 && event.reason ? `: ${event.reason}` : "";
+    notice(`Live connection closed (${event.code})${detail}; reconnecting automatically in ${(delay/1000).toFixed(2)} seconds…`);
+    reconnectTimer=setTimeout(connectStream,delay);
+  };
+}
+window.addEventListener("beforeunload",()=>{allowReconnect=false;if(reconnectTimer!==null)clearTimeout(reconnectTimer);});
+setInterval(async()=>{
+  if(authenticated){
+    if(running && socket.bufferedAmount<65536)
+      socket.send(JSON.stringify({type:"heartbeat",session,played_frame:played,
+        echo_monotonic:lastServerEcho,echo_delay_s:(performance.now()-lastServerReceivedAt)/1000}));
+    return;
+  }
+  if(heartbeatBusy)return;heartbeatBusy=true;
+  try{
+    const data=running ? await api("/api/heartbeat",{session,played_frame:played}) : await api("/api/status");
+    showStatus(data);
+  }catch(e){notice(e.message);}
+  finally{heartbeatBusy=false;}
+},150);
+setInterval(async()=>{
+  const peer=rtcPeer;if(!peer || !running)return;
+  try{
+    const stats=await peer.getStats();
+    if(peer!==rtcPeer)return;
+    const videoStats=[...stats.values()].find(s=>s.type==="inbound-rtp" && s.kind==="video");
+    if(videoStats)latency.rtc(videoStats);
+    rtcStats=[...stats.values()].filter(s=>s.type==="inbound-rtp").map(s=>({
+      kind:s.kind,framesDecoded:s.framesDecoded,framesDropped:s.framesDropped,
+      packetsLost:s.packetsLost,bytesReceived:s.bytesReceived,codecId:s.codecId,
+      codec:stats.get(s.codecId)?.mimeType,
+      framesReceived:s.framesReceived,freezeCount:s.freezeCount,totalFreezesDuration:s.totalFreezesDuration,
+    }));
+    const active=[...stats.values()].find(s=>s.type==="transport" && s.selectedCandidatePairId);
+    const pair=stats.get(active?.selectedCandidatePairId);
+    if(pair){
+      const local=stats.get(pair.localCandidateId),remote=stats.get(pair.remoteCandidateId);
+      rtcRoute={localType:local?.candidateType,remoteType:remote?.candidateType,protocol:local?.protocol,
+        relayProtocol:local?.relayProtocol,roundTripTime:pair.currentRoundTripTime};
+    }
+    rtcHistory.push({at:performance.now(),played,received,rtcFramesPresented,rtcLastTimestamp,rtcLastReceivedTimestamp,rtcStats});
+    if(rtcHistory.length>16)rtcHistory.shift();
+    if(played>0 && rtcLastMappedAt && performance.now()-rtcLastMappedAt>5000)
+      notice("RTC playback feedback has temporarily stalled; holding the last frame and continuing to wait without stopping the session.");
+    renderLatency();
+  }catch{}
+},1000);
+if(!token)notice("Missing access token. Open the localhost link from the launch instructions.");
+if(!duelUI)fetch("/api/reference",{headers:{"Authorization":"Bearer "+token}}).then(async r=>{
+  if(r.ok){$("reference").src=URL.createObjectURL(await r.blob());$("reference").hidden=false;}
+}).catch(()=>{});
+requestAnimationFrame(render);
+connectStream();
+// Read-only observability for automated checks; no control hooks.
+window.h3Debug=()=>({running,session,cursor,played,received,displayedVersion,
+  startupBufferedFrames:startupBuffer.frames,startupTargetFrames:startupBuffer.targetFrames,
+  queuedFrames:frames.length,audioState:transport==="rtc" ? (rtcVideo.paused?"suspended":"running"):audio?.state,epoch,underruns,
+  transport,rtcState,rtcStats,rtcFramesPresented,videoWidth:rtcVideo.videoWidth,videoHeight:rtcVideo.videoHeight,
+  rtcFailure,rtcRoute,rtcJitterTargetApplied,
+  latency:{samples:latency.samples(),latest:latency.latest(),clientDecodeMs:latency.clientDecodeMs,
+    clientBufferMs:latency.clientBufferMs,rtcDecodeMs:latency.rtcDecodeMs,rtcBufferMs:latency.rtcBufferMs},
+  promptSubmissions,displayTransitions,
+  playbackWallSeconds:playbackStartedAt===null?0:(performance.now()-playbackStartedAt)/1000});
+window.h3Benchmark={
+  clock:async()=>{
+    const t0=performance.now(),r=await api("/api/clock",{}),t1=performance.now();
+    return {t0,t1,server_monotonic:r.server_monotonic,
+      offset_s:r.server_monotonic-(t0+t1)/2000,error_s:(t1-t0)/2000};
+  },
+  send:async(prompt,plannedAt)=>{
+    const submittedAt=performance.now();
+    benchEvent("request_submit",{plannedAt,prompt,submittedAt});
+    try{
+      const r=await api("/api/prompt",{session,prompt,next_prompt:prompt});
+      latency.submit(r.version,submittedAt,performance.now());
+      benchEvent("request_ack",{plannedAt,submittedAt,version:r.version,
+        arrival_monotonic:r.arrival_monotonic});
+      return r;
+    }catch(e){benchEvent("request_error",{plannedAt,message:String(e)});throw e;}
+  },
+  mark:(name)=>{const at=performance.now();benchEvent(name,{at,played,received,
+    queuedFrames:frames.length,stall_active:benchStallStart!==null,
+    audioState:audio?.state,server_horizon_frame:serverState?.session_state?.horizon_frame,
+    server_budget_s:serverState?.session_state?.budget_s,
+    server_committed_frame:serverState?.session_state?.committed_frame});return at;},
+  snapshot:()=>({at:performance.now(),events:benchEvents.slice(),stall_start:benchStallStart,
+    last_frame:benchLastFrame,debug:window.h3Debug()}),
+};
+</script>
+</html>

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speculative-sampling"
+version = "1.0.0"
+description = "Interactive streaming for bidirectional video generation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+
+[project.optional-dependencies]
+runtime = ["numpy>=1.26", "pillow>=10", "websockets>=14"]
+rtc = ["speculative-sampling[runtime]", "aiortc==1.14.0", "av>=14"]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["speculative_sampling*"]
+
+[tool.setuptools.package-data]
+"speculative_sampling.runtime" = ["web/*.html", "web/*.js"]
+"speculative_sampling.models.h3" = ["configs/*.json"]
+"speculative_sampling.models.h3.sol_h3_vae" = ["decoder_config.json", "THIRD_PARTY_NOTICES.md"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
